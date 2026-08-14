@@ -261,6 +261,30 @@ void SuffixTree::buildSuffixTree() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Memory accounting
+// ─────────────────────────────────────────────────────────────────────────────
+
+size_t SuffixTree::memoryBytes() const noexcept {
+  // Node pool and the private end values for internal nodes. capacity()
+  // rather than size() because buildSuffixTree() reserves the 2n+2 worst case
+  // up front, and that reservation is genuinely resident.
+  size_t total = _nodes.capacity() * sizeof(Node) +
+                 _nodeEnds.capacity() * sizeof(int64_t);
+
+  // Each node carries its own child hash map, which allocates outside the
+  // node itself: a bucket array plus one heap node per child edge. This is an
+  // estimate — the exact layout is implementation defined — but it dominates
+  // the footprint and cannot be ignored.
+  for (const Node &node : _nodes) {
+    total += node.children.bucket_count() * sizeof(void *);
+    total += node.children.size() *
+             (sizeof(std::pair<const int64_t, int64_t>) + sizeof(void *));
+  }
+
+  return total;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Search — O(m) descent, then DFS to collect all leaf offsets
 // ─────────────────────────────────────────────────────────────────────────────
 

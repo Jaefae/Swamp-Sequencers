@@ -1,4 +1,5 @@
-build/
+# Build directories — build/, build-bench/, build-ninja/, etc.
+build*/
 bin/
 CMakeCache.txt
 CMakeFiles/
@@ -8,3 +9,14 @@ data/
 .DS_Store
 .cache/
 cmake-build-debug/
+
+# Genome data. The reference genome is downloaded at configure time and is
+# ~5.6 MB; it is never committed.
+*.fna
+*.fasta
+*.fna.gz
+
+# Benchmark output. bench/results/ is committed on purpose (reference runs),
+# so only ignore stray CSV/logs left in the repo root.
+/*.csv
+/*.log

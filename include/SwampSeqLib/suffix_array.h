@@ -65,6 +65,11 @@ public:
   // Direct read-only access to the underlying suffix array.
   const std::vector<size_t> &sa() const noexcept;
 
+  // Heap bytes held by the index itself, excluding the indexed text (which
+  // both structures share). This is the number the benchmark plots against
+  // SuffixTree::memoryBytes(); for a suffix array it is simply the array.
+  size_t memoryBytes() const noexcept;
+
 private:
   // ── Internal data ─────────────────────────────────────────────────────────
 

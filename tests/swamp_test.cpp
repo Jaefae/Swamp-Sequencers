@@ -231,3 +231,125 @@ TEST(SuffixTree, InternalState) {
   EXPECT_TRUE(ST.ready());
   EXPECT_EQ(ST.size(), 6);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Differential tests
+//
+// The two structures are independent implementations of the same contract, so
+// any query where they disagree is a bug in one of them. This catches the
+// class of defect the per-structure tests above miss: both are checked against
+// hand-written expectations on tiny inputs, while the bugs in this code have
+// historically been out-of-bounds indexing that only appears at scale.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Build a random genome over the standard nucleotide alphabet. Seeded
+// explicitly so a CI failure reproduces locally from the test name alone.
+static std::string randomGenome(size_t length, uint32_t seed) {
+  std::mt19937 rng(seed);
+  std::uniform_int_distribution<size_t> pick(0, possibleChars.size() - 1);
+
+  std::string genome;
+  genome.reserve(length);
+  for (size_t i = 0; i < length; ++i)
+    genome.push_back(possibleChars[pick(rng)]);
+
+  return genome;
+}
+
+// Compare the two indexes over the same text for one pattern.
+static void expectSameMatches(const SuffixArray &SA, const SuffixTree &ST,
+                              const std::string &pattern) {
+  auto arrayRes = SA.search(pattern);
+  auto treeRes = ST.search(pattern);
+  sortResults(treeRes);
+
+  ASSERT_EQ(arrayRes.size(), treeRes.size())
+      << "match count differs for pattern \"" << pattern << "\"";
+
+  for (size_t i = 0; i < arrayRes.size(); ++i) {
+    EXPECT_EQ(static_cast<int64_t>(arrayRes[i].offset), treeRes[i].offset)
+        << "offset " << i << " differs for pattern \"" << pattern << "\"";
+    EXPECT_EQ(static_cast<int64_t>(arrayRes[i].length), treeRes[i].length);
+  }
+}
+
+TEST(Equivalence, RandomGenomePresentPatterns) {
+  const std::string genome = randomGenome(20000, 1234);
+
+  SuffixArray SA(genome);
+  SuffixTree ST(genome);
+
+  // Patterns drawn out of the text itself, so every one has at least one hit.
+  // Short patterns exercise result collection over large subtrees; long ones
+  // exercise deep edge traversal.
+  std::mt19937 rng(5678);
+  for (size_t patternLength : {1, 2, 3, 5, 8, 13, 21, 34}) {
+    std::uniform_int_distribution<size_t> pick(0, genome.size() - patternLength);
+    for (int trial = 0; trial < 25; ++trial) {
+      const std::string pattern = genome.substr(pick(rng), patternLength);
+      expectSameMatches(SA, ST, pattern);
+    }
+  }
+}
+
+TEST(Equivalence, RandomGenomeAbsentPatterns) {
+  // 'Q' is outside the nucleotide alphabet, so every pattern containing it
+  // must miss in both structures.
+  const std::string genome = randomGenome(5000, 99);
+
+  SuffixArray SA(genome);
+  SuffixTree ST(genome);
+
+  for (const std::string &pattern :
+       {std::string("Q"), std::string("ACGQ"), std::string("QQQQQQ"),
+        std::string("ACGTACGTQACGT")}) {
+    expectSameMatches(SA, ST, pattern);
+    EXPECT_EQ(SA.search(pattern).size(), 0u);
+  }
+}
+
+TEST(Equivalence, HighlyRepetitiveText) {
+  // Repetitive input is the worst case for the suffix tree's edge splitting
+  // and produces the deepest subtrees for leaf collection.
+  std::string genome;
+  for (size_t i = 0; i < 500; ++i)
+    genome += "ACGT";
+
+  SuffixArray SA(genome);
+  SuffixTree ST(genome);
+
+  for (const std::string &pattern :
+       {std::string("A"), std::string("ACGT"), std::string("ACGTACGT"),
+        std::string("TACG"), std::string("GTA")}) {
+    expectSameMatches(SA, ST, pattern);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Memory footprint
+//
+// Guards the property the benchmark reports on: the suffix array is a flat
+// 8-bytes-per-character array, while the suffix tree costs orders of magnitude
+// more. A regression that silently inflated the array would invalidate every
+// tradeoff conclusion drawn from the benchmark.
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(MemoryFootprint, SuffixArrayIsOnePointerPerCharacter) {
+  const std::string genome = randomGenome(4096, 7);
+  SuffixArray SA(genome);
+
+  EXPECT_EQ(SA.memoryBytes(), genome.size() * sizeof(size_t));
+}
+
+TEST(MemoryFootprint, SuffixTreeCostsMoreThanSuffixArray) {
+  const std::string genome = randomGenome(4096, 7);
+
+  SuffixArray SA(genome);
+  SuffixTree ST(genome);
+
+  EXPECT_GT(ST.memoryBytes(), SA.memoryBytes());
+
+  // Ukkonen allocates at most 2n+1 nodes; anything beyond that means the
+  // construction is creating nodes it should be reusing.
+  EXPECT_LE(ST.nodeCount(), 2 * genome.size() + 1);
+}

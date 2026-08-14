@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to the same branch supersedes any run still in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Build the library + GoogleTest suite and run it ────────────────────────
+  # SWAMP_BUILD_TUI=OFF skips FTXUI and, more importantly, the ~5 MB genome
+  # download NCBI serves at configure time — CI would otherwise fail whenever
+  # that endpoint is slow or rate-limited. The tests use inline strings only.
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.build_type }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ matrix.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DSWAMP_BUILD_TUI=OFF
+          -DSWAMP_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
+
+      - name: Test
+        run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
+
+  # ── Same suite under AddressSanitizer + UndefinedBehaviorSanitizer ─────────
+  # Both indexes do heavy raw-pointer and index arithmetic (Ukkonen stores
+  # int64_t* into a vector; SA-IS indexes buckets by computed offset), which is
+  # exactly the class of bug a plain pass/fail run will not surface.
+  sanitizers:
+    name: sanitizers (asan + ubsan)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-asan-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DSWAMP_BUILD_TUI=OFF
+          -DSWAMP_ENABLE_ASAN=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build --output-on-failure
+
+  # ── Benchmark ─────────────────────────────────────────────────────────────
+  # Runs a deliberately small sweep so it stays inside a normal CI budget, and
+  # publishes the CSV as an artifact so the performance tradeoff can be tracked
+  # across commits rather than measured once and forgotten.
+  benchmark:
+    name: benchmark
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DSWAMP_BUILD_TUI=OFF
+          -DSWAMP_BUILD_TESTS=OFF
+          -DSWAMP_BUILD_BENCH=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run benchmark
+        run: ./build/bin/SwampBench --max-size 200000 --steps 4 --queries 200 > bench_results.csv
+
+      - name: Summarize
+        run: |
+          echo '### Suffix Array vs. Suffix Tree' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat bench_results.csv >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench_results.csv

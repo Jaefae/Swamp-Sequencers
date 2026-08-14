@@ -55,6 +55,16 @@ public:
   // True once the suffix tree has been successfully built.
   bool ready() const noexcept { return _ready; }
 
+  // Heap bytes held by the index itself, excluding the indexed text (which
+  // both structures share): the node pool, the per-internal-node end values,
+  // and every node's child hash map. The child maps are estimated from their
+  // bucket and element counts, so this is close to but not exactly what the
+  // allocator reports.
+  size_t memoryBytes() const noexcept;
+
+  // Number of nodes in the tree. Ukkonen allocates at most 2n+1 of them.
+  size_t nodeCount() const noexcept { return _nodes.size(); }
+
 private:
 
   // ── Node ──────────────────────────────────────────────────────────────────

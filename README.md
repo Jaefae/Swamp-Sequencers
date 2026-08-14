@@ -1,4 +1,6 @@
 # SwampSequencer
+[![CI](https://github.com/MichaelAmiot/Swamp-Sequencers/actions/workflows/ci.yml/badge.svg)](https://github.com/MichaelAmiot/Swamp-Sequencers/actions/workflows/ci.yml)
+
 ## Overview
 Given a massive DNA genome database, finding where a specific gene sequence pattern appears is the core operation behind disease detection, ancestry matching, and drug research.
 
@@ -31,6 +33,63 @@ Or run the automated Google Test suite
 # Swamp-Sequencers/build
 bin/SwampTests
 ```
+
+## Build options
+
+| Option | Default | Effect |
+|---|---|---|
+| `SWAMP_BUILD_TUI` | `ON` | Build the FTXUI front-end and download the reference genome |
+| `SWAMP_BUILD_TESTS` | `ON` | Build the GoogleTest suite |
+| `SWAMP_BUILD_BENCH` | `OFF` | Build the `SwampBench` benchmark |
+| `SWAMP_ENABLE_ASAN` | `OFF` | Build with AddressSanitizer + UndefinedBehaviorSanitizer |
+
+Turning the TUI off skips both FTXUI and the ~5 MB NCBI genome download, which
+makes a test-only build much faster:
+
+```Bash
+cmake -B build -DSWAMP_BUILD_TUI=OFF
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and
+pull request to `main`:
+
+- **test** — builds and runs the suite on Linux, macOS, and Windows in both
+  Debug and Release.
+- **sanitizers** — reruns the suite under ASan + UBSan. Both indexes do heavy
+  raw-pointer and index arithmetic, which is exactly the class of bug a plain
+  pass/fail run will not surface.
+- **benchmark** — runs a small sweep and publishes the CSV as a build artifact
+  so the performance tradeoff is tracked across commits.
+
+Alongside the per-structure unit tests, the suite includes **differential
+tests**: the suffix array and suffix tree are independent implementations of the
+same contract, so any query where they disagree is a bug in one of them.
+
+## Benchmark
+
+See [`bench/README.md`](bench/README.md). Headline results on the E. coli
+reference genome (5,594,605 bases, 50-step sweep):
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="bench/results/memory-dark.svg">
+  <img alt="Index memory against text length: the suffix array grows to 45 MB while the suffix tree reaches 1,931 MB, 43.1 times larger." src="bench/results/memory-light.svg" width="100%">
+</picture>
+
+| | Suffix array | Suffix tree | |
+|---|---|---|---|
+| Memory | 44.8 MB | 1,931 MB | **43.1× larger** |
+| Build time | 848 ms | 8,373 ms | **9.9× slower** |
+| Query (m = 64) | 1.18 µs | 3.03 µs | **2.6× slower** |
+
+The suffix tree loses on all three axes here — it is not a speed-for-memory
+trade in this implementation. Its cost is dominated by the per-node
+`std::unordered_map`; a fixed 4-way child array for the DNA alphabet is the
+change most likely to close the gap.
+
 ## Attribution
     - Michael Amiot
     - Jack Hendrix
