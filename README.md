@@ -8,7 +8,7 @@ This project benchmarks the performance, memory efficiency, and build constraint
 ## Getting Started
 ### 1. Clone the repository
 ```Bash
-git clone https://github.com/MichaelAmiot/Swamp-Sequencers
+git clone https://github.com/Jaefae/Swamp-Sequencers
 cd Swamp-Sequencers
 ```
 
