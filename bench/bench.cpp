@@ -1,30 +1,3 @@
-// SwampBench — suffix array vs. suffix tree
-//
-// Measures the three axes the two structures actually trade against each other:
-// build time, index memory, and query latency.
-//
-// Output discipline: the CSV goes to stdout and nothing else ever does, so
-//
-//     SwampBench --max-size 200000 --steps 4 --queries 200 > results.csv
-//
-// captures exactly the data. Progress chatter goes to stderr, which is why CI
-// can redirect stdout straight into an artifact.
-//
-// The CSV is "tidy" (one measurement per row) rather than one column per
-// metric, so new metrics can be added without breaking anything already
-// parsing it:
-//
-//     experiment,structure,x,metric,value
-//
-//   experiment – "scaling" (x = text length n) or "query" (x = pattern length m)
-//   structure  – "array" or "tree"
-//   metric     – build_ms | memory_bytes | query_us | total_hits | node_count
-//
-// total_hits is not a performance number; it is the sanity check. Every pattern
-// is sampled *from the text being searched*, so a run in which some structure
-// reports fewer hits than queries has a correctness bug, and a run in which the
-// two structures disagree has a bug in one of them.
-
 #include "SwampSeqLib/suffix_array.h"
 #include "SwampSeqLib/suffix_tree.h"
 
@@ -42,26 +15,19 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-// Tunables
-
-// Pattern length used by the scaling sweep. Long enough that a sampled pattern
-// is almost always unique in the text, so the scaling numbers measure the
-// search itself rather than the cost of reporting a huge occurrence list.
+// Long enough that a sampled pattern is almost always unique, so the scaling
+// numbers measure the search rather than the cost of reporting every hit.
 constexpr size_t kScalingPatternLength = 20;
 
-// Pattern lengths for the query sweep. Short patterns are match-list bound,
-// long ones are descent bound; the crossover is the interesting part.
 constexpr size_t kQueryLengths[] = {4, 8, 12, 16, 24, 32, 48, 64};
 
 struct Config {
-  std::string fasta;             // empty => generate a synthetic genome
-  size_t maxSize = 1000000;      // largest n in the scaling sweep
-  size_t steps = 5;              // number of points in the scaling sweep
-  size_t queries = 1000;         // patterns timed per measurement
-  uint32_t seed = 20240817;      // drives both text generation and sampling
+  std::string fasta;
+  size_t maxSize = 1000000;
+  size_t steps = 5;
+  size_t queries = 1000;
+  uint32_t seed = 20240817;
 };
-
-// CSV
 
 void emit(const char *experiment, const char *structure, size_t x,
           const char *metric, double value) {
@@ -69,11 +35,6 @@ void emit(const char *experiment, const char *structure, size_t x,
             << std::fixed << std::setprecision(4) << value << '\n';
 }
 
-// Input
-
-// Read a FASTA file, dropping '>' header lines and keeping only ACGT. That also
-// silently drops line endings, lowercase soft-masked regions' case, and the
-// ambiguity codes (N and friends) that neither index treats specially.
 bool loadFasta(const std::string &path, std::string &out) {
   std::ifstream in(path);
   if (!in) {
@@ -97,8 +58,6 @@ bool loadFasta(const std::string &path, std::string &out) {
   return true;
 }
 
-// Uniform random ACGT. Real genomes are not uniform, which is exactly why the
-// default is reproducible-synthetic and --fasta exists for the real thing.
 std::string generateGenome(size_t n, std::mt19937 &rng) {
   static const char kBases[] = {'A', 'C', 'G', 'T'};
   std::uniform_int_distribution<int> pick(0, 3);
@@ -109,10 +68,7 @@ std::string generateGenome(size_t n, std::mt19937 &rng) {
   return text;
 }
 
-// Measurement
-
-// Sample `count` patterns of length `m` from `text`. Sampling from the text is
-// what makes total_hits meaningful (see the header comment).
+// Sampling from the text is what makes total_hits a usable correctness check.
 std::vector<std::string> samplePatterns(const std::string &text, size_t m,
                                         size_t count, std::mt19937 &rng) {
   std::vector<std::string> pats;
@@ -130,9 +86,6 @@ struct QueryStats {
   size_t totalHits = 0;
 };
 
-// Time `search` across every pattern. The hit count is accumulated inside the
-// timed loop on purpose: it consumes the returned vector, so the optimizer
-// cannot discard the search as dead code.
 template <typename Index>
 QueryStats timeQueries(const Index &index, const std::vector<std::string> &pats) {
   QueryStats stats;
@@ -140,6 +93,8 @@ QueryStats timeQueries(const Index &index, const std::vector<std::string> &pats)
     return stats;
 
   const auto start = Clock::now();
+  // Accumulating inside the timed loop consumes the result, so the optimizer
+  // cannot discard the search as dead code.
   for (const std::string &p : pats)
     stats.totalHits += index.search(p).size();
   const auto elapsed = Clock::now() - start;
@@ -154,10 +109,6 @@ double millisSince(Clock::time_point start) {
   return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
-// Experiments
-
-// Build both indexes at increasing text lengths. This is the experiment behind
-// the memory and build-time columns in the README.
 void runScaling(const std::string &text, const Config &cfg, std::mt19937 &rng) {
   for (size_t step = 1; step <= cfg.steps; ++step) {
     const size_t n = text.size() * step / cfg.steps;
@@ -169,9 +120,8 @@ void runScaling(const std::string &text, const Config &cfg, std::mt19937 &rng) {
     const std::vector<std::string> pats =
         samplePatterns(sub, kScalingPatternLength, cfg.queries, rng);
 
-    // Each index is built in its own scope and timed in place. Both classes
-    // hold a raw pointer into their own owned copy of the text, so they are
-    // deliberately never moved after construction.
+    // Both classes hold a raw pointer into their own copy of the text, so they
+    // are built in place and never moved.
     {
       const auto start = Clock::now();
       const SuffixArray sa{sub};
@@ -200,8 +150,6 @@ void runScaling(const std::string &text, const Config &cfg, std::mt19937 &rng) {
   }
 }
 
-// Sweep pattern length against a single pair of indexes built over the whole
-// text, isolating query cost from build cost.
 void runQuery(const std::string &text, const Config &cfg, std::mt19937 &rng) {
   std::cerr << "bench: building indexes over " << text.size() << " bases ...";
   const SuffixArray sa{text};
@@ -227,14 +175,10 @@ void runQuery(const std::string &text, const Config &cfg, std::mt19937 &rng) {
   }
 }
 
-// Argument parsing
-
 const char *kUsage =
     "usage: SwampBench [--fasta PATH] [--max-size N] [--steps N] "
     "[--queries N] [--seed N]";
 
-// Distinguishes "print usage and stop successfully" from "bad arguments", so
-// --help exits 0 and a typo exits 1.
 enum class ParseResult { Ok, HelpRequested, Error };
 
 ParseResult parseArgs(int argc, char **argv, Config &cfg) {
@@ -300,7 +244,6 @@ int main(int argc, char **argv) {
       return 1;
     std::cerr << "bench: loaded " << text.size() << " bases from " << cfg.fasta
               << '\n';
-    // --max-size truncates a real genome; it cannot extend one.
     if (cfg.maxSize > text.size()) {
       std::cerr << "bench: clamping --max-size to " << text.size() << '\n';
       cfg.maxSize = text.size();

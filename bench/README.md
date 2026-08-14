@@ -4,9 +4,9 @@ Both structures index a text in O(n) and answer "where does this pattern occur"
 exactly. They differ in what that costs. `SwampBench` measures the three axes
 they actually trade against each other:
 
-- **build time** — how long constructing the index takes
-- **index memory** — heap held by the index, *excluding* the text (both share it)
-- **query latency** — average time per `search()` call
+- **build time**: how long constructing the index takes
+- **index memory**: heap held by the index, *excluding* the text (both share it)
+- **query latency**: average time per `search()` call
 
 ## Building and running
 
@@ -46,9 +46,7 @@ repeat structure:
 The CSV goes to **stdout** and progress messages go to **stderr**, so
 `SwampBench > results.csv` captures exactly the data and nothing else.
 
-Rows are tidy — one measurement each — so new metrics can be added without
-breaking existing parsers:
-
+Rows a formed as such:
 ```
 experiment,structure,x,metric,value
 ```
@@ -60,11 +58,11 @@ experiment,structure,x,metric,value
 | `x` | n for `scaling`, m for `query` |
 | `metric` | `build_ms`, `memory_bytes`, `query_us`, `total_hits`, `node_count` |
 
-Two experiments run per invocation:
+Two experiments run per benchmark:
 
-- **scaling** — rebuilds both indexes at each n, with a fixed pattern length of
+- **scaling**: rebuilds both indexes at each n, with a fixed pattern length of
   20. This is where build time and memory come from.
-- **query** — builds both indexes *once* over the full text, then sweeps pattern
+- **query**: builds both indexes *once* over the full text, then sweeps pattern
   length m over 4, 8, 12, 16, 24, 32, 48, 64. This isolates query cost from
   build cost.
 
@@ -120,14 +118,13 @@ whole story. The array is exactly 8 bytes per base; the tree needs ~345.
 | 64 | 1.18 µs | 3.03 µs | 1.1 |
 
 Below m = 12 a pattern matches so often that both structures are bound by
-*materializing* the occurrence list rather than finding it — at m = 4 every
+*materializing* the occurrence list rather than finding it; at m = 4 every
 4-mer occurs ~25,000 times in this genome. Those rows measure
 `collectLeaves`/array-slice throughput, not search, which is why the chart omits
 them. From m = 16 up the patterns are effectively unique and latency flattens.
 
 E. coli is real DNA and therefore repetitive, so short patterns match far more
-often here than in the synthetic run — the crossover to "effectively unique"
-sits at m = 12 rather than m = 8.
+often than in synthetic data.
 
 ## Regenerating the charts
 
@@ -154,11 +151,6 @@ joined with `<picture>` so the right one loads:
 The figures are transparent rather than painting their own background, so they
 stay seamless on GitHub's dimmed and high-contrast themes too.
 
-Which pattern lengths appear in the query chart is derived from the data, not
-hardcoded: any m whose hit count is far above the large-m baseline is dropped,
-because those points measure list-building rather than search. On a more
-repetitive text that threshold moves on its own.
-
 ## Interpretation
 
 The suffix tree loses on **all three** axes here. That is worth stating plainly
@@ -168,17 +160,10 @@ to buy something over the array's O(m log n). It does not, at this scale.
 The cause is the per-node `std::unordered_map<int64_t, int64_t>` child map. On
 the E. coli genome the tree allocates 9.2M nodes for 5.6M bases, and each one
 carries a separate hash table for a DNA alphabet with only **four** possible
-children — about 209 bytes per node. That map both inflates memory (it dominates
+children, about 209 bytes per node. That map both inflates memory (it dominates
 the 1,931 MB) and destroys locality on descent: every edge step is a hash lookup
 into a distinct heap allocation, while the array's binary search walks one
 contiguous block.
-
-The change most likely to close the gap is replacing the map with a fixed 4-way
-child array. That trades a hash table per node for 4 indices per node, and turns
-each descent step into a single indexed load.
-
-Until then, on this workload the suffix array is the better structure - it is
-not a speed-for-memory trade, it is strictly ahead.
 
 ## CI
 
@@ -189,7 +174,3 @@ runs a deliberately small sweep:
 SwampBench --max-size 200000 --steps 4 --queries 200 > bench_results.csv
 ```
 
-That stays inside a normal CI budget (~1 s) and uploads the CSV as an artifact,
-so the tradeoff is tracked across commits rather than measured once and
-forgotten. The benchmark is intentionally **not** registered with CTest —
-it measures, it does not assert, so a slow runner can never produce a red build.

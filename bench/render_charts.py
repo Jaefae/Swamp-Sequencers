@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Render SwampBench CSV output into README charts.
-
-One SVG per metric per theme, so each chart can be linked on its own. A README
-is read on a white canvas *and* a near-black one, so the pair is joined with
-<picture>:
-
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="...-dark.svg">
-      <img alt="..." src="...-light.svg">
-    </picture>
-
-Requires matplotlib (`pip install matplotlib`).
-
-Usage:
-    python bench/render_charts.py [bench/results/data.csv]
-"""
+"""Render SwampBench CSV output into README charts. See bench/README.md."""
 
 import csv
 import os
@@ -28,9 +13,7 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 
 matplotlib.rcParams["svg.fonttype"] = "path"
 
-# For rendering in both dark and light mode. The two series colors are a
-# validated categorical pair; they clear colorblind separation and 3:1 contrast
-# against both canvases. Re-validate if you change them rather than eyeballing.
+# The series colors are a colorblind-safe pair checked against both canvases.
 THEMES = {
     "light": {
         "array": "#2a78d6",
@@ -73,11 +56,7 @@ def series(data, experiment, structure, metric, xs):
 
 
 def draw_ratio_bracket(ax, x, lo, hi, span, t):
-    """Vertical bracket spanning the two endpoints, labelled with their ratio.
-
-    This is the comparison the chart exists to make, so it gets drawn rather
-    than left for the reader to compute from two axis positions.
-    """
+    """Vertical bracket spanning the two endpoints, labelled with their ratio."""
     bx = x + 0.07 * span
     cap = 0.02 * span
     ax.plot([bx, bx], [lo, hi], color=t["muted"], linewidth=1,
@@ -91,7 +70,6 @@ def draw_ratio_bracket(ax, x, lo, hi, span, t):
 
 
 def draw_chart(fig, ax, spec, t):
-    """One line chart: 2px lines, a soft wash beneath, endpoint labels only."""
     xs = spec["xs"]
     xmin, xmax = min(xs), max(xs)
     span = (xmax - xmin) or 1
@@ -100,8 +78,7 @@ def draw_chart(fig, ax, spec, t):
         color = t[ckey]
         ax.fill_between(xs, vals, color=color, alpha=0.09, linewidth=0,
                         zorder=2)
-        # A single marker on the last point anchors the value label. Marking
-        # every point turns a 50-step sweep into a bead necklace.
+        # Marker on the last point only; it anchors the value label.
         ax.plot(xs, vals, color=color, linewidth=2, marker="o",
                 markevery=[-1], markersize=5,
                 solid_capstyle="round", solid_joinstyle="round",
@@ -119,8 +96,6 @@ def draw_chart(fig, ax, spec, t):
     # Right margin holds the ratio bracket and its label.
     ax.set_xlim(xmin, xmax + 0.22 * span)
 
-    # Let the locator choose a handful of round ticks. Ticking every measured
-    # point is unreadable once the sweep has more than a few steps.
     ax.xaxis.set_major_locator(MaxNLocator(nbins=5, steps=[1, 2, 2.5, 5, 10]))
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: spec["xfmt"](v)))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=4, steps=[1, 2, 2.5, 5, 10]))
@@ -130,7 +105,6 @@ def draw_chart(fig, ax, spec, t):
     lo, hi = sorted(vals[-1] for _, _, vals in spec["lines"])
     draw_ratio_bracket(ax, xmax, lo, hi, span, t)
 
-    # Recessive chrome: hairline solid gridlines, baseline only.
     ax.grid(axis="y", color=t["grid"], linewidth=0.8, linestyle="-")
     ax.set_axisbelow(True)
     for side in ("top", "right", "left"):
@@ -147,11 +121,8 @@ def build_specs(data):
     as_2dp = lambda v: f"{v:.2f}"
     as_bases = lambda v: f"{v / 1_000_000:.1f}M"
 
-    # Short patterns match so often that the timing measures building the
-    # result list, not searching, and their spike flattens everything else.
-    # Which lengths those are depends on the text, so derive it instead of
-    # hardcoding: at large m a sampled pattern matches about once, so the
-    # smallest total_hits stands in for the query count.
+    # Drop pattern lengths that match far more often than the large-m baseline:
+    # those time list-building, not search. Derived so it adapts to the text.
     hits = data[("query", "array", "total_hits")]
     all_m = sorted(data[("query", "array", "query_us")])
     baseline = min(hits[m] for m in all_m)
@@ -164,9 +135,7 @@ def build_specs(data):
                 ": patterns this short match too many times, so the timing is "
                 "dominated by building the result list rather than searching.")
 
-    # Stay in MB even when the tree runs into gigabytes: in GB the array reads
-    # "0.04", which throws away the only precision that side of the comparison
-    # has. The bracket carries the ratio either way.
+    # MB even when the tree runs into gigabytes; in GB the array reads "0.04".
     scaled = lambda vs: [v / 1e6 for v in vs]
 
     return [
@@ -228,13 +197,10 @@ def render(spec, theme, out_path):
     fig.text(0.105, 0.885, SUBTITLE, fontsize=9.5, color=t["muted"],
              ha="left", va="top")
     if spec.get("note"):
-        # Wrap explicitly: matplotlib's own wrap= does not respect the figure
-        # margins, so a long note runs off the canvas.
+        # Wrap explicitly; matplotlib's wrap= ignores the figure margins.
         fig.text(0.105, 0.025, textwrap.fill(spec["note"], 84), fontsize=8.5,
                  color=t["muted"], ha="left", va="bottom", linespacing=1.5)
 
-    # Legend always present for two or more series, so identity never rests on
-    # color alone.
     legend = fig.legend(loc="upper right", bbox_to_anchor=(0.985, 0.99),
                         ncol=2, frameon=False, fontsize=10, handlelength=1.6,
                         columnspacing=1.6)
