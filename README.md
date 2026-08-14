@@ -105,9 +105,6 @@ Alongside the per-structure unit tests, the suite includes **differential
 tests**: the suffix array and suffix tree are independent implementations of the
 same contract, so any query where they disagree is a bug in one of them.
 
-See [`bench/README.md`](bench/README.md). Headline results on the E. coli
-reference genome (5,594,605 bases, 50-step sweep):
-
 ## Attribution
     - Michael Amiot
     - Jack Hendrix
