@@ -16,7 +16,6 @@
 using namespace ftxui;
 
 int main() {
-  // Shared state
   std::string searchPattern = "ATGC";
   std::string filePath = "bin/ecoli.fna";
   int algoChoice = 0;
@@ -28,7 +27,6 @@ int main() {
   std::vector<std::string> previewLines;
   int selectedResult = 0;
   bool isRunning = false;
-  // UI components
   auto screen = ScreenInteractive::TerminalOutput();
 
   Component inputFilepath = Input(&filePath, "e.g., ./data/genome.fna");
@@ -67,7 +65,6 @@ int main() {
         return;
       }
 
-      // Initialize all variables to safe defaults
       std::vector<SearchResult> saRes;
       double saTimeMs = 0.0;
       int saMatchCount = 0;
@@ -76,7 +73,6 @@ int main() {
       double stTimeMs = 0.0;
       int stMatchCount = 0;
 
-      // Suffix Array
       if (algoChoice == 0 || algoChoice == 2) {
         statusText = "Building Suffix Array...";
         screen.Post(Event::Custom);
@@ -91,7 +87,6 @@ int main() {
             std::chrono::duration<double>(saEnd - saStart).count() * 1000.0;
       }
 
-      // Suffix Tree
       if (algoChoice == 1 || algoChoice == 2) {
         statusText = "Building Suffix Tree...";
         screen.Post(Event::Custom);
@@ -106,17 +101,14 @@ int main() {
             std::chrono::duration<double>(stEnd - stStart).count() * 1000.0;
       }
 
-      // Logic: Build previews from whichever one we ran
       std::vector<std::string> localStrings;
       const char *data = map.data();
 
-      // Determine which results to use for the preview list
       int totalToDisplay = (algoChoice == 1) ? stMatchCount : saMatchCount;
       int previewLimit = std::min<int>(totalToDisplay, 2000);
       int contextLen = 25;
 
       for (int i = 0; i < previewLimit; i++) {
-        // Safe access: Use stRes if we did Tree, otherwise saRes
         size_t idx = (algoChoice == 1) ? stRes[i].offset : saRes[i].offset;
 
         size_t startIdx = (idx > (size_t)contextLen) ? (idx - contextLen) : 0;
@@ -128,7 +120,6 @@ int main() {
                                snippet + "...");
       }
 
-      // Format times
       std::stringstream ss;
       ss.imbue(std::locale::classic());
       ss << std::fixed << std::setprecision(1) << saTimeMs;

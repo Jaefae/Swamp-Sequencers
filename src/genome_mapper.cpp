@@ -15,7 +15,6 @@
 #include <stdexcept>
 #include <string>
 
-// Generator
 void GenomeMapper::fromFile(const std::string& filePath) {
 #ifdef OS_WINDOWS
   // Open the source file, then copy it into an anonymous writable mapping.
@@ -89,7 +88,6 @@ void GenomeMapper::fromFile(const std::string& filePath) {
     char* firstNewLine = static_cast<char*>(
         std::memchr(data, '\n', static_cast<size_t>(dataEnd - data)));
     if (firstNewLine) {
-      // Bump char pointer to sequence start
       data = firstNewLine + 1;
     }
   }
@@ -107,7 +105,6 @@ void GenomeMapper::fromFile(const std::string& filePath) {
       continue;
     }
 
-    // Collect valid sequence members
     char upper = std::toupper(static_cast<unsigned char>(*src));
     if (upper == 'A' || upper == 'C' || upper == 'T' || upper == 'G' ||
         upper == 'N') {
@@ -123,7 +120,6 @@ GenomeMapper::GenomeMapper(const std::string& filePath) { fromFile(filePath); }
 GenomeMapper::GenomeMapper() {};
 
 GenomeMapper::~GenomeMapper() {
-  // Handle clean-up based on OS
 #ifdef OS_WINDOWS
   if (_mappingBase) UnmapViewOfFile(_mappingBase);
   if (_fileHandle != INVALID_HANDLE_VALUE) CloseHandle(_fileHandle);

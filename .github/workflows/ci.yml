@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Build the library + GoogleTest suite and run it ────────────────────────
+  # Build the library + GoogleTest suite and run it
   # SWAMP_BUILD_TUI=OFF skips FTXUI and, more importantly, the ~5 MB genome
   # download NCBI serves at configure time — CI would otherwise fail whenever
   # that endpoint is slow or rate-limited. The tests use inline strings only.
@@ -48,7 +48,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
 
-  # ── Same suite under AddressSanitizer + UndefinedBehaviorSanitizer ─────────
+  # Same suite under AddressSanitizer + UndefinedBehaviorSanitizer
   # Both indexes do heavy raw-pointer and index arithmetic (Ukkonen stores
   # int64_t* into a vector; SA-IS indexes buckets by computed offset), which is
   # exactly the class of bug a plain pass/fail run will not surface.
@@ -81,7 +81,6 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ctest --test-dir build --output-on-failure
 
-  # ── Benchmark ─────────────────────────────────────────────────────────────
   # Runs a deliberately small sweep so it stays inside a normal CI budget, and
   # publishes the CSV as an artifact so the performance tradeoff can be tracked
   # across commits rather than measured once and forgotten.

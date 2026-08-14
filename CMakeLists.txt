@@ -1,21 +1,16 @@
-# Set minimum CMake version required
 cmake_minimum_required(VERSION 3.15)
 
-# Define project
 project(SwampSequencer VERSION 1.0 LANGUAGES CXX)
 
-# Define C++ Standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Centralize binary output for easier testing
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-# Build options 
 # The TUI pulls in FTXUI and downloads the ~5 MB E. coli genome at configure
 # time. CI only needs the library and the test suite, so both are opt-out:
 #   cmake -B build -DSWAMP_BUILD_TUI=OFF
@@ -24,7 +19,6 @@ option(SWAMP_BUILD_TESTS "Build the GoogleTest suite"                           
 option(SWAMP_BUILD_BENCH "Build the suffix array vs. suffix tree benchmark"            OFF)
 option(SWAMP_ENABLE_ASAN "Build with AddressSanitizer + UndefinedBehaviorSanitizer"    OFF)
 
-# Sanitizers 
 # Applied globally so the library, tests, and benchmark are all instrumented.
 if(SWAMP_ENABLE_ASAN)
   if(MSVC)
@@ -34,10 +28,8 @@ if(SWAMP_ENABLE_ASAN)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
-# Enable CTest
 enable_testing()
 
-# Fetch GTest framework
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -53,7 +45,6 @@ if(SWAMP_BUILD_TUI)
   FetchContent_MakeAvailable(ftxui)
 endif()
 
-# Add src subdirectory
 add_subdirectory(src)
 
 if(SWAMP_BUILD_BENCH)
@@ -61,7 +52,6 @@ if(SWAMP_BUILD_BENCH)
 endif()
 
 if(SWAMP_BUILD_TESTS)
-  # Option for Windows compatibility
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
 

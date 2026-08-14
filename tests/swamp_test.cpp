@@ -232,7 +232,6 @@ TEST(SuffixTree, InternalState) {
   EXPECT_EQ(ST.size(), 6);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Differential tests
 //
 // The two structures are independent implementations of the same contract, so
@@ -240,7 +239,6 @@ TEST(SuffixTree, InternalState) {
 // class of defect the per-structure tests above miss: both are checked against
 // hand-written expectations on tiny inputs, while the bugs in this code have
 // historically been out-of-bounds indexing that only appears at scale.
-// ─────────────────────────────────────────────────────────────────────────────
 
 // Build a random genome over the standard nucleotide alphabet. Seeded
 // explicitly so a CI failure reproduces locally from the test name alone.
@@ -325,14 +323,12 @@ TEST(Equivalence, HighlyRepetitiveText) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Memory footprint
 //
 // Guards the property the benchmark reports on: the suffix array is a flat
 // 8-bytes-per-character array, while the suffix tree costs orders of magnitude
 // more. A regression that silently inflated the array would invalidate every
 // tradeoff conclusion drawn from the benchmark.
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(MemoryFootprint, SuffixArrayIsOnePointerPerCharacter) {
   const std::string genome = randomGenome(4096, 7);

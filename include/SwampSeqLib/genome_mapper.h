@@ -29,20 +29,16 @@ class GenomeMapper {
   bool _isValid = false;
 
 public:
-  // Constructor/Destructor
   explicit GenomeMapper(const std::string &filePath);
   GenomeMapper();
   ~GenomeMapper();
 
-  // Remove copying
   GenomeMapper(const GenomeMapper &) = delete;
   GenomeMapper &operator=(const GenomeMapper &) = delete;
 
-  // Accessors
   const char *data() const;
   char *data();
   size_t size() const;
   bool isValid() const;
-  // Generator
   void fromFile(const std::string &filePath);
 };
