@@ -49,8 +49,8 @@ reference genome (5,594,605 bases after filtering to ACGT), 50-step sweep,
 ### Memory
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/memory-dark.svg">
-  <img alt="Index memory against text length: the suffix array grows to 45 MB while the suffix tree reaches 1,931 MB, 43.1 times larger." src="results/memory-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="bench/results/memory-dark.svg">
+  <img alt="Index memory against text length: the suffix array grows to 45 MB while the suffix tree reaches 1,931 MB, 43.1 times larger." src="bench/results/memory-light.svg" width="100%">
 </picture>
 
 Both are linear in n, as O(n) construction requires — the constant factor is the
@@ -59,15 +59,15 @@ whole story. The array is exactly 8 bytes per base; the tree needs ~345.
 ### Build time
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/build-dark.svg">
-  <img alt="Build time against text length: the suffix array reaches 848 ms while the suffix tree reaches 8,373 ms, 9.9 times slower." src="results/build-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="bench/results/build-dark.svg">
+  <img alt="Build time against text length: the suffix array reaches 848 ms while the suffix tree reaches 8,373 ms, 9.9 times slower." src="bench/results/build-light.svg" width="100%">
 </picture>
 
 ### Query latency
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/query-dark.svg">
-  <img alt="Query latency against pattern length: the suffix array stays near 1.2 microseconds while the suffix tree stays near 3 microseconds." src="results/query-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="bench/results/query-dark.svg">
+  <img alt="Query latency against pattern length: the suffix array stays near 1.2 microseconds while the suffix tree stays near 3 microseconds." src="bench/results/query-light.svg" width="100%">
 </picture>
 
 ## Build options
