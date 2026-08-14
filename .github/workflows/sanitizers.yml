@@ -1,0 +1,52 @@
+name: sanitizers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to the same branch supersedes any run still in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The GoogleTest suite rerun under AddressSanitizer + UndefinedBehaviorSanitizer
+  # (SWAMP_ENABLE_ASAN turns on -fsanitize=address,undefined).
+  # Both indexes do heavy raw-pointer and index arithmetic (Ukkonen stores
+  # int64_t* into a vector; SA-IS indexes buckets by computed offset), which is
+  # exactly the class of bug a plain pass/fail run will not surface.
+  #
+  # SWAMP_BUILD_TUI=OFF skips FTXUI and the ~5 MB genome download NCBI serves at
+  # configure time, which would otherwise fail whenever that endpoint is slow or
+  # rate-limited. The tests use inline strings only.
+  sanitizers:
+    name: asan + ubsan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-asan-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DSWAMP_BUILD_TUI=OFF
+          -DSWAMP_ENABLE_ASAN=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build --output-on-failure

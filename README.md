@@ -1,5 +1,6 @@
 # SwampSequencer
 [![CI](https://github.com/Jaefae/Swamp-Sequencers/actions/workflows/ci.yml/badge.svg)](https://github.com/Jaefae/Swamp-Sequencers/actions/workflows/ci.yml)
+[![sanitizers](https://github.com/Jaefae/Swamp-Sequencers/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/Jaefae/Swamp-Sequencers/actions/workflows/sanitizers.yml)
 
 ## Overview
 Given a massive DNA genome database, finding where a specific gene sequence pattern appears is the core operation behind disease detection, ancestry matching, and drug research.
@@ -90,16 +91,23 @@ ctest --test-dir build --output-on-failure
 
 ## Continuous integration
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and
-pull request to `main`:
+Two workflows run on every push and pull request to `main`, each reporting its
+own badge above.
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
 - **test**: builds and runs the suite on Linux, macOS, and Windows in both
   Debug and Release.
-- **sanitizers**: reruns the suite under ASan + UBSan. Both indexes do heavy
-  raw-pointer and index arithmetic, which is exactly the class of bug a plain
-  pass/fail run will not surface.
 - **benchmark**: runs a small sweep and publishes the CSV as a build artifact
   so the performance tradeoff is tracked across commits.
+
+[`.github/workflows/sanitizers.yml`](.github/workflows/sanitizers.yml):
+
+- **asan + ubsan**: reruns the suite with `SWAMP_ENABLE_ASAN=ON`. Both indexes
+  do heavy raw-pointer and index arithmetic, which is exactly the class of bug a
+  plain pass/fail run will not surface. It is a separate workflow because GitHub
+  badges report per workflow, combined into `ci.yml` a sanitizer
+  failure would be indistinguishable from a plain test failure.
 
 Alongside the per-structure unit tests, the suite includes **differential
 tests**: the suffix array and suffix tree are independent implementations of the
